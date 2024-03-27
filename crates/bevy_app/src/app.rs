@@ -914,13 +914,8 @@ impl App {
         let label = label.intern();
         let mut schedules = self.world.resource_mut::<Schedules>();
 
-        if schedules.get(label).is_none() {
-            schedules.insert(Schedule::new(label));
-        }
-
-        let schedule = schedules.get_mut(label).unwrap();
         // Call the function f, passing in the schedule retrieved
-        f(schedule);
+        f(schedules.get_or_insert(label));
 
         self
     }

@@ -140,7 +140,9 @@ impl PluginGroupBuilder {
         for plugin_id in order {
             self.upsert_plugin_entry_state(
                 plugin_id,
-                plugins.remove(&plugin_id).unwrap(),
+                plugins
+                    .remove(&plugin_id)
+                    .expect("ordered plugins list should be consistent with map"),
                 self.order.len(),
             );
 

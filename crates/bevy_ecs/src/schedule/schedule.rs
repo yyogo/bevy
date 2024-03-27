@@ -50,6 +50,18 @@ impl Schedules {
         self.inner.insert(schedule.label, schedule)
     }
 
+    /// Gets or inserts a schedule with the given label.
+    ///
+    /// If the schedule with the given label is already in the map, it is returned.
+    /// Otherwise, a new schedule with the label is created and inserted into the
+    /// map and then returned.
+    pub fn get_or_insert(&mut self, label: impl ScheduleLabel) -> &mut Schedule {
+        let label = label.intern();
+        self.inner
+            .entry(label)
+            .or_insert_with(|| Schedule::new(label))
+    }
+
     /// Removes the schedule corresponding to the `label` from the map, returning it if it existed.
     pub fn remove(&mut self, label: impl ScheduleLabel) -> Option<Schedule> {
         self.inner.remove(&label.intern())
