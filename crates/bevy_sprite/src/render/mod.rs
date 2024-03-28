@@ -668,7 +668,12 @@ pub fn prepare_sprites(
                 transparent_phase.items[batch_item_index]
                     .batch_range_mut()
                     .end += 1;
-                batches.last_mut().unwrap().1.range.end += 1;
+                batches
+                    .last_mut()
+                    .expect("at least one batch should be present")
+                    .1
+                    .range
+                    .end += 1;
                 index += 1;
             }
         }
@@ -726,11 +731,10 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteViewBindGroup<I
         sprite_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        pass.set_bind_group(
-            I,
-            sprite_meta.into_inner().view_bind_group.as_ref().unwrap(),
-            &[view_uniform.offset],
-        );
+        let Some(bind_group) = sprite_meta.into_inner().view_bind_group.as_ref() else {
+            return RenderCommandResult::Failure;
+        };
+        pass.set_bind_group(I, bind_group, &[view_uniform.offset]);
         RenderCommandResult::Success
     }
 }
@@ -747,19 +751,18 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetSpriteTextureBindGrou
         image_bind_groups: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        let image_bind_groups = image_bind_groups.into_inner();
         let Some(batch) = batch else {
             return RenderCommandResult::Failure;
         };
+        let Some(bind_group) = image_bind_groups
+            .into_inner()
+            .values
+            .get(&batch.image_handle_id)
+        else {
+            return RenderCommandResult::Failure;
+        };
 
-        pass.set_bind_group(
-            I,
-            image_bind_groups
-                .values
-                .get(&batch.image_handle_id)
-                .unwrap(),
-            &[],
-        );
+        pass.set_bind_group(I, bind_group, &[]);
         RenderCommandResult::Success
     }
 }
@@ -781,20 +784,15 @@ impl<P: PhaseItem> RenderCommand<P> for DrawSpriteBatch {
         let Some(batch) = batch else {
             return RenderCommandResult::Failure;
         };
+        let Some(sprite_index_buffer) = sprite_meta.sprite_index_buffer.buffer() else {
+            return RenderCommandResult::Failure;
+        };
+        pass.set_index_buffer(sprite_index_buffer.slice(..), 0, IndexFormat::Uint32);
 
-        pass.set_index_buffer(
-            sprite_meta.sprite_index_buffer.buffer().unwrap().slice(..),
-            0,
-            IndexFormat::Uint32,
-        );
-        pass.set_vertex_buffer(
-            0,
-            sprite_meta
-                .sprite_instance_buffer
-                .buffer()
-                .unwrap()
-                .slice(..),
-        );
+        let Some(sprite_instance_buffer) = sprite_meta.sprite_instance_buffer.buffer() else {
+            return RenderCommandResult::Failure;
+        };
+        pass.set_vertex_buffer(0, sprite_instance_buffer.slice(..));
         pass.draw_indexed(0..6, 0, batch.range.clone());
         RenderCommandResult::Success
     }

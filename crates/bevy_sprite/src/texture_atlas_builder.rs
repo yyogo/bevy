@@ -257,7 +257,10 @@ impl<'a> TextureAtlasBuilder<'a> {
         let mut texture_ids = HashMap::default();
         // We iterate through the textures to place to respect the insertion order for the texture indices
         for (index, (image_id, texture)) in self.textures_to_place.iter().enumerate() {
-            let (_, packed_location) = rect_placements.packed_locations().get(&index).unwrap();
+            let (_, packed_location) = rect_placements
+                .packed_locations()
+                .get(&index)
+                .expect("texture placement should be found in packed locations");
 
             let min = UVec2::new(packed_location.x(), packed_location.y());
             let max =

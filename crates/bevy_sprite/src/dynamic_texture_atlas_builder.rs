@@ -5,7 +5,7 @@ use bevy_render::{
     render_asset::{RenderAsset, RenderAssetUsages},
     texture::{Image, TextureFormatPixelInfo},
 };
-use guillotiere::{size2, Allocation, AtlasAllocator};
+use guillotiere::{Allocation, AtlasAllocator};
 
 /// Helper utility to update [`TextureAtlasLayout`] on the fly.
 ///
@@ -25,7 +25,11 @@ impl DynamicTextureAtlasBuilder {
     /// * `padding` - gap added between textures in the atlas, both in x axis and y axis
     pub fn new(size: UVec2, padding: u32) -> Self {
         Self {
-            atlas_allocator: AtlasAllocator::new(to_size2(size)),
+            atlas_allocator: AtlasAllocator::new(
+                to_size2(size).unwrap_or_else(|| {
+                    panic!("invalid size for texture atlas allocation: {size:?}")
+                }),
+            ),
             padding,
         }
     }
@@ -49,12 +53,14 @@ impl DynamicTextureAtlasBuilder {
         texture: &Image,
         atlas_texture_handle: &Handle<Image>,
     ) -> Option<usize> {
-        let allocation = self.atlas_allocator.allocate(size2(
-            (texture.width() + self.padding).try_into().unwrap(),
-            (texture.height() + self.padding).try_into().unwrap(),
-        ));
+        let allocation = self.atlas_allocator.allocate(to_size2(UVec2::new(
+            texture.width() + self.padding,
+            texture.height() + self.padding,
+        ))?);
         if let Some(allocation) = allocation {
-            let atlas_texture = textures.get_mut(atlas_texture_handle).unwrap();
+            let atlas_texture = textures
+                .get_mut(atlas_texture_handle)
+                .expect("TextureAtlasLayout asset should exist");
             assert!(
                 atlas_texture
                     .asset_usage()
@@ -63,7 +69,8 @@ impl DynamicTextureAtlasBuilder {
             );
 
             self.place_texture(atlas_texture, allocation, texture);
-            let mut rect: URect = to_rect(allocation.rectangle);
+            let mut rect: URect =
+                to_rect(allocation.rectangle).expect("invalid texture allocation rect");
             rect.max = rect.max.saturating_sub(UVec2::splat(self.padding));
             Some(atlas_layout.add_texture(rect))
         } else {
@@ -95,19 +102,22 @@ impl DynamicTextureAtlasBuilder {
     }
 }
 
-fn to_rect(rectangle: guillotiere::Rectangle) -> URect {
-    URect {
+fn to_rect(rectangle: guillotiere::Rectangle) -> Option<URect> {
+    Some(URect {
         min: UVec2::new(
-            rectangle.min.x.try_into().unwrap(),
-            rectangle.min.y.try_into().unwrap(),
+            rectangle.min.x.try_into().ok()?,
+            rectangle.min.y.try_into().ok()?,
         ),
         max: UVec2::new(
-            rectangle.max.x.try_into().unwrap(),
-            rectangle.max.y.try_into().unwrap(),
+            rectangle.max.x.try_into().ok()?,
+            rectangle.max.y.try_into().ok()?,
         ),
-    }
+    })
 }
 
-fn to_size2(vec2: UVec2) -> guillotiere::Size {
-    guillotiere::Size::new(vec2.x as i32, vec2.y as i32)
+fn to_size2(vec2: UVec2) -> Option<guillotiere::Size> {
+    Some(guillotiere::Size::new(
+        vec2.x.try_into().ok()?,
+        vec2.y.try_into().ok()?,
+    ))
 }
