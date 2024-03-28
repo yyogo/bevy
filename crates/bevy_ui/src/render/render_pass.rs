@@ -166,11 +166,10 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetUiViewBindGroup<I> {
         ui_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        pass.set_bind_group(
-            I,
-            ui_meta.into_inner().view_bind_group.as_ref().unwrap(),
-            &[view_uniform.offset],
-        );
+        let Some(bind_group) = ui_meta.into_inner().view_bind_group.as_ref() else {
+            return RenderCommandResult::Failure;
+        };
+        pass.set_bind_group(I, bind_group, &[view_uniform.offset]);
         RenderCommandResult::Success
     }
 }
@@ -193,7 +192,10 @@ impl<P: PhaseItem, const I: usize> RenderCommand<P> for SetUiTextureBindGroup<I>
             return RenderCommandResult::Failure;
         };
 
-        pass.set_bind_group(I, image_bind_groups.values.get(&batch.image).unwrap(), &[]);
+        let Some(bind_group) = image_bind_groups.values.get(&batch.image) else {
+            return RenderCommandResult::Failure;
+        };
+        pass.set_bind_group(I, bind_group, &[]);
         RenderCommandResult::Success
     }
 }
@@ -217,10 +219,16 @@ impl<P: PhaseItem> RenderCommand<P> for DrawUiNode {
 
         let ui_meta = ui_meta.into_inner();
         // Store the vertices
-        pass.set_vertex_buffer(0, ui_meta.vertices.buffer().unwrap().slice(..));
+        let Some(buffer) = &ui_meta.vertices.buffer() else {
+            return RenderCommandResult::Failure;
+        };
+        pass.set_vertex_buffer(0, buffer.slice(..));
         // Define how to "connect" the vertices
+        let Some(indices_buffer) = &ui_meta.indices.buffer() else {
+            return RenderCommandResult::Failure;
+        };
         pass.set_index_buffer(
-            ui_meta.indices.buffer().unwrap().slice(..),
+            indices_buffer.slice(..),
             0,
             bevy_render::render_resource::IndexFormat::Uint32,
         );

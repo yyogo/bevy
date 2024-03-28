@@ -164,13 +164,19 @@ where
 
         let mut descriptor = RenderPipelineDescriptor {
             vertex: VertexState {
-                shader: UI_MATERIAL_SHADER_HANDLE,
+                shader: self
+                    .vertex_shader
+                    .clone()
+                    .unwrap_or(UI_MATERIAL_SHADER_HANDLE),
                 entry_point: "vertex".into(),
                 shader_defs: shader_defs.clone(),
                 buffers: vec![vertex_layout],
             },
             fragment: Some(FragmentState {
-                shader: UI_MATERIAL_SHADER_HANDLE,
+                shader: self
+                    .fragment_shader
+                    .clone()
+                    .unwrap_or(UI_MATERIAL_SHADER_HANDLE),
                 shader_defs,
                 entry_point: "fragment".into(),
                 targets: vec![Some(ColorTargetState {
@@ -183,7 +189,7 @@ where
                     write_mask: ColorWrites::ALL,
                 })],
             }),
-            layout: vec![],
+            layout: vec![self.view_layout.clone(), self.ui_layout.clone()],
             push_constant_ranges: Vec::new(),
             primitive: PrimitiveState {
                 front_face: FrontFace::Ccw,
@@ -202,15 +208,6 @@ where
             },
             label: Some("ui_material_pipeline".into()),
         };
-        if let Some(vertex_shader) = &self.vertex_shader {
-            descriptor.vertex.shader = vertex_shader.clone();
-        }
-
-        if let Some(fragment_shader) = &self.fragment_shader {
-            descriptor.fragment.as_mut().unwrap().shader = fragment_shader.clone();
-        }
-
-        descriptor.layout = vec![self.view_layout.clone(), self.ui_layout.clone()];
 
         M::specialize(&mut descriptor, key);
 
@@ -273,11 +270,10 @@ impl<P: PhaseItem, M: UiMaterial, const I: usize> RenderCommand<P> for SetMatUiV
         ui_meta: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        pass.set_bind_group(
-            I,
-            ui_meta.into_inner().view_bind_group.as_ref().unwrap(),
-            &[view_uniform.offset],
-        );
+        let Some(bind_group) = ui_meta.into_inner().view_bind_group.as_ref() else {
+            return RenderCommandResult::Failure;
+        };
+        pass.set_bind_group(I, bind_group, &[view_uniform.offset]);
         RenderCommandResult::Success
     }
 }
@@ -326,7 +322,10 @@ impl<P: PhaseItem, M: UiMaterial> RenderCommand<P> for DrawUiMaterialNode<M> {
             return RenderCommandResult::Failure;
         };
 
-        pass.set_vertex_buffer(0, ui_meta.into_inner().vertices.buffer().unwrap().slice(..));
+        let Some(buffer) = ui_meta.into_inner().vertices.buffer() else {
+            return RenderCommandResult::Failure;
+        };
+        pass.set_vertex_buffer(0, buffer.slice(..));
         pass.draw(batch.range.clone(), 0..1);
         RenderCommandResult::Success
     }
@@ -587,7 +586,7 @@ pub fn prepare_uimaterial_nodes<M: UiMaterial>(
                     }
 
                     index += QUAD_INDICES.len() as u32;
-                    existing_batch.unwrap().1.range.end = index;
+                    existing_batch.map(|batch| batch.1.range.end = index);
                     ui_phase.items[batch_item_index].batch_range_mut().end += 1;
                 } else {
                     batch_shader_handle = AssetId::invalid();

@@ -780,7 +780,9 @@ pub fn extract_uinode_text(
                 color = LinearRgba::from(text.sections[*section_index].style.color);
                 current_section = *section_index;
             }
-            let atlas = texture_atlases.get(&atlas_info.texture_atlas).unwrap();
+            let atlas = texture_atlases
+                .get(&atlas_info.texture_atlas)
+                .expect("Texture atlases asset should exist");
 
             let mut rect = atlas.textures[atlas_info.glyph_index].as_rect();
             rect.min *= inverse_scale_factor;
@@ -1005,7 +1007,9 @@ pub fn prepare_uinodes(
                     {
                         if let Some(gpu_image) = gpu_images.get(extracted_uinode.image) {
                             batch_image_handle = extracted_uinode.image;
-                            existing_batch.as_mut().unwrap().1.image = extracted_uinode.image;
+                            existing_batch
+                                .as_mut()
+                                .map(|batch| batch.1.image = extracted_uinode.image);
 
                             image_bind_groups
                                 .values
@@ -1152,7 +1156,7 @@ pub fn prepare_uinodes(
                     vertices_index += 6;
                     indices_index += 4;
 
-                    existing_batch.unwrap().1.range.end = vertices_index;
+                    existing_batch.map(|batch| batch.1.range.end = vertices_index);
                     ui_phase.items[batch_item_index].batch_range_mut().end += 1;
                 } else {
                     batch_image_handle = AssetId::invalid();

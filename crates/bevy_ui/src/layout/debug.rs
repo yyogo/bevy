@@ -2,6 +2,7 @@ use crate::UiSurface;
 use bevy_ecs::prelude::Entity;
 use bevy_utils::HashMap;
 use std::fmt::Write;
+use taffy::error::TaffyError;
 use taffy::prelude::Node;
 use taffy::tree::LayoutTree;
 
@@ -23,7 +24,8 @@ pub fn print_ui_layout_tree(ui_surface: &UiSurface) {
                 false,
                 String::new(),
                 &mut out,
-            );
+            )
+            .expect("printing layout tree should succeed");
         }
         bevy_utils::tracing::info!("Layout tree for camera entity: {entity:?}\n{out}");
     }
@@ -38,12 +40,12 @@ fn print_node(
     has_sibling: bool,
     lines_string: String,
     acc: &mut String,
-) {
+) -> Result<(), TaffyError> {
     let tree = &ui_surface.taffy;
-    let layout = tree.layout(node).unwrap();
-    let style = tree.style(node).unwrap();
+    let layout = tree.layout(node)?;
+    let style = tree.style(node)?;
 
-    let num_children = tree.child_count(node).unwrap();
+    let num_children = tree.child_count(node)?;
 
     let display_variant = match (num_children, style.display) {
         (_, taffy::style::Display::None) => "NONE",
@@ -73,17 +75,21 @@ fn print_node(
     let new_string = lines_string + bar;
 
     // Recurse into children
-    for (index, child_node) in tree.children(node).unwrap().iter().enumerate() {
+    for (index, child_node) in tree.children(node)?.iter().enumerate() {
         let has_sibling = index < num_children - 1;
-        let child_entity = taffy_to_entity.get(child_node).unwrap();
+        let child_entity = taffy_to_entity
+            .get(child_node)
+            .cloned()
+            .unwrap_or(Entity::PLACEHOLDER); // the entity is just printed to debug so placeholder is fine
         print_node(
             ui_surface,
             taffy_to_entity,
-            *child_entity,
+            child_entity,
             *child_node,
             has_sibling,
             new_string.clone(),
             acc,
-        );
+        )?;
     }
+    Ok(())
 }

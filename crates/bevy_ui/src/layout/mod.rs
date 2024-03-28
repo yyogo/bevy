@@ -94,13 +94,15 @@ impl UiSurface {
         let taffy = &mut self.taffy;
         let taffy_node = self.entity_to_taffy.entry(entity).or_insert_with(|| {
             added = true;
-            taffy.new_leaf(convert::from_style(context, style)).unwrap()
+            taffy
+                .new_leaf(convert::from_style(context, style))
+                .expect("Taffy::new_leaf() should not fail")
         });
 
         if !added {
             self.taffy
                 .set_style(*taffy_node, convert::from_style(context, style))
-                .unwrap();
+                .expect("Taffy::set_style() should not fail");
         }
     }
 
@@ -129,23 +131,30 @@ without UI components as a child of an entity with UI components, results may be
             }
         }
 
-        let taffy_node = self.entity_to_taffy.get(&entity).unwrap();
+        let taffy_node = self
+            .entity_to_taffy
+            .get(&entity)
+            .expect("entity should have matching taffy node");
         self.taffy
             .set_children(*taffy_node, &taffy_children)
-            .unwrap();
+            .expect("Taffy::set_children() should not fail");
     }
 
     /// Removes children from the entity's taffy node if it exists. Does nothing otherwise.
     pub fn try_remove_children(&mut self, entity: Entity) {
         if let Some(taffy_node) = self.entity_to_taffy.get(&entity) {
-            self.taffy.set_children(*taffy_node, &[]).unwrap();
+            self.taffy
+                .set_children(*taffy_node, &[])
+                .expect("Taffy::set_children() should not fail");
         }
     }
 
     /// Removes the measure from the entity's taffy node if it exists. Does nothing otherwise.
     pub fn try_remove_measure(&mut self, entity: Entity) {
         if let Some(taffy_node) = self.entity_to_taffy.get(&entity) {
-            self.taffy.set_measure(*taffy_node, None).unwrap();
+            self.taffy
+                .set_measure(*taffy_node, None)
+                .expect("Taffy::set_measure() should not fail");
         }
     }
 
@@ -172,7 +181,10 @@ without UI components as a child of an entity with UI components, results may be
         let existing_roots = self.camera_roots.entry(camera_id).or_default();
         let mut new_roots = Vec::new();
         for entity in children {
-            let node = *self.entity_to_taffy.get(&entity).unwrap();
+            let node = *self
+                .entity_to_taffy
+                .get(&entity)
+                .expect("entity should have matching taffy node");
             let root_node = existing_roots
                 .iter()
                 .find(|n| n.user_root_node == node)
@@ -180,13 +192,19 @@ without UI components as a child of an entity with UI components, results may be
                 .unwrap_or_else(|| {
                     if let Some(previous_parent) = self.taffy.parent(node) {
                         // remove the root node from the previous implicit node's children
-                        self.taffy.remove_child(previous_parent, node).unwrap();
+                        self.taffy
+                            .remove_child(previous_parent, node)
+                            .expect("Taffy::remove_child() should not fail");
                     }
 
-                    let viewport_node = *camera_root_node_map
-                        .entry(entity)
-                        .or_insert_with(|| self.taffy.new_leaf(viewport_style.clone()).unwrap());
-                    self.taffy.add_child(viewport_node, node).unwrap();
+                    let viewport_node = *camera_root_node_map.entry(entity).or_insert_with(|| {
+                        self.taffy
+                            .new_leaf(viewport_style.clone())
+                            .expect("Taffy::new_leaf() should not fail")
+                    });
+                    self.taffy
+                        .add_child(viewport_node, node)
+                        .expect("Taffy::add_child() should not fail");
 
                     RootNodePair {
                         implicit_viewport_node: viewport_node,
@@ -212,7 +230,7 @@ without UI components as a child of an entity with UI components, results may be
         for root_nodes in camera_root_nodes {
             self.taffy
                 .compute_layout(root_nodes.implicit_viewport_node, available_space)
-                .unwrap();
+                .expect("Taffy::compute_layout() should not fail")
         }
     }
 
@@ -221,7 +239,9 @@ without UI components as a child of an entity with UI components, results may be
         for entity in entities {
             if let Some(camera_root_node_map) = self.camera_entity_to_taffy.remove(&entity) {
                 for (_, node) in camera_root_node_map.iter() {
-                    self.taffy.remove(*node).unwrap();
+                    self.taffy
+                        .remove(*node)
+                        .expect("Taffy::remove() should not fail");
                 }
             }
         }
@@ -231,7 +251,9 @@ without UI components as a child of an entity with UI components, results may be
     pub fn remove_entities(&mut self, entities: impl IntoIterator<Item = Entity>) {
         for entity in entities {
             if let Some(node) = self.entity_to_taffy.remove(&entity) {
-                self.taffy.remove(node).unwrap();
+                self.taffy
+                    .remove(node)
+                    .expect("Taffy::remove() should not fail");
             }
         }
     }
